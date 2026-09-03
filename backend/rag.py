@@ -42,21 +42,29 @@ class NoteLibrary:
         tokenized_chunks = [tokenize(chunk) for chunk in self.chunks]
         bm25 = BM25Okapi(tokenized_chunks)
 
-        tokenized_query = tokenize(query)
-        scores = bm25.get_scores(tokenized_query)
+        query_tokens = tokenize(query)
+        query_token_set = set(query_tokens)
+        scores = bm25.get_scores(query_tokens)
 
         ranked_indices = sorted(
             range(len(scores)), key=lambda i: scores[i], reverse=True
         )
 
-        results = []
-        for i in ranked_indices[:top_k]:
-            if scores[i] <= 0:
-                continue
-            results.append({
+        def build_result(i: int) -> dict:
+            return {
                 "text": self.chunks[i],
                 "source": self.sources[i],
                 "score": round(float(scores[i]), 3),
-            })
+            }
 
-        return results
+        positive_matches = [
+            build_result(i) for i in ranked_indices[:top_k] if scores[i] > 0
+        ]
+        if positive_matches:
+            return positive_matches
+
+        overlap_matches = [
+            build_result(i) for i in ranked_indices[:top_k]
+            if query_token_set & set(tokenized_chunks[i])
+        ]
+        return overlap_matches
