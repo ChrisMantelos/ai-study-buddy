@@ -128,13 +128,17 @@ Backend: fully tested by running the server and sending real requests.
 Confirmed working: input validation (empty notes rejected, question count
 capped at 10), missing API key handled cleanly, invalid API key handled
 cleanly with no crash. The notes library and topic-based retrieval
-(`/notes`, `/generate-quiz-from-topic`) were also tested directly: adding
+(`/notes`, `/generate-quiz-from-topic`) were tested on two separate
+machines. During that testing, a real bug was found and fixed: BM25
+scoring returns negative/zero scores for terms that appear in a very
+small library (a known edge case with tiny corpora), which caused valid
+matches to be filtered out. The fix falls back to keyword-overlap
+matching when no positive BM25 scores are found. After the fix: adding
 documents, listing them, searching with a matching topic (correctly
 reaches the AI call and stops cleanly without a key), and searching with
-an unrelated topic (correctly returns a 404 with no relevant chunks
-found). The success path (a valid key producing a real quiz, from either
-endpoint) was not run, since that requires a real key - confirm that once
-yourself.
+an unrelated topic (correctly returns a 404) all work as expected. The
+success path (a valid key producing a real quiz, from either endpoint)
+was not run, since that requires a real key - confirm that once yourself.
 
 Frontend: written but not run against the Flutter SDK, since it is not
 available in the environment this was built in. The code has been checked
