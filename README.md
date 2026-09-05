@@ -30,6 +30,7 @@ ai-study-buddy/
     backend/
         main.py           FastAPI app: quiz generation, notes library endpoints
         rag.py            chunking and BM25 retrieval for the notes library
+        database.py       SQLite persistence for the notes library
         requirements.txt
     frontend/
         lib/
@@ -109,8 +110,9 @@ curl -X POST http://127.0.0.1:8000/generate-quiz-from-topic \
 The backend searches the library for the most relevant chunks using BM25
 keyword search, sends only those chunks to Claude, and returns a quiz -
 the same pattern used in the "RAG and Agentic Search" section of the
-"Building with the Claude API" course. The library is kept in memory and
-resets when the server restarts; it is not persisted to disk.
+"Building with the Claude API" course. The library is stored in a local
+SQLite file (`notes.db`, created automatically next to `main.py`), so it
+survives server restarts.
 
 ## Deploying the backend
 
@@ -139,6 +141,11 @@ reaches the AI call and stops cleanly without a key), and searching with
 an unrelated topic (correctly returns a 404) all work as expected. The
 success path (a valid key producing a real quiz, from either endpoint)
 was not run, since that requires a real key - confirm that once yourself.
+
+Persistence was also verified directly: added a note, killed the server
+process completely (not just `--reload`, an actual process kill), started
+a fresh process, and confirmed the note was still there and searchable.
+The library now survives restarts via a local SQLite file (`notes.db`).
 
 Frontend: written but not run against the Flutter SDK, since it is not
 available in the environment this was built in. The code has been checked
