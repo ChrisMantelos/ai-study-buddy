@@ -82,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
+                constraints: const BoxConstraints(maxWidth: 720),
                 child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -120,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       expands: true,
                       textAlignVertical: TextAlignVertical.top,
                       style: StudyText.mono,
+                      onChanged: (_) => setState(() {}),
                       decoration: InputDecoration(
                         border: InputBorder.none,
                         hintText: 'Paste study notes here...',
@@ -127,6 +128,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: StudyColors.inkSoft,
                         ),
                       ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      '${notesController.text.length} / 8000 characters',
+                      style: StudyText.label,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -172,12 +181,25 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: StudyColors.incorrect, width: 4),
                         ),
                       ),
-                      child: Text(
-                        errorMessage!,
-                        style: StudyText.mono.copyWith(
-                          color: StudyColors.incorrect,
-                          fontSize: 13,
-                        ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            size: 16,
+                            color: StudyColors.incorrect,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              errorMessage!,
+                              style: StudyText.mono.copyWith(
+                                color: StudyColors.incorrect,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
