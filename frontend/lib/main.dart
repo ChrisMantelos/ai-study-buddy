@@ -78,11 +78,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: NotebookBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
@@ -140,7 +141,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<int>(
                             value: numQuestions,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            isDense: true,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
                             style: StudyText.mono,
                             items: [3, 5, 7, 10]
                                 .map((n) => DropdownMenuItem(
@@ -198,10 +201,75 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                   ),
+                  const SizedBox(height: 40),
+                  const _ExampleQuestionPreview(),
                 ],
               ),
             ),
           ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExampleQuestionPreview extends StatelessWidget {
+  const _ExampleQuestionPreview();
+
+  static const options = ['Ribosome', 'Mitochondria', 'Golgi apparatus'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.55,
+      child: Container(
+        padding: const EdgeInsets.only(top: 20),
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: StudyColors.paperLine, width: 1),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Example - this is what comes back', style: StudyText.label),
+            const SizedBox(height: 10),
+            Text(
+              'Which organelle is described as the site of cellular respiration?',
+              style: StudyText.questionText,
+            ),
+            const SizedBox(height: 16),
+            ...List.generate(options.length, (index) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: StudyColors.ink, width: 2),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(13),
+                          topRight: Radius.circular(11),
+                          bottomLeft: Radius.circular(11),
+                          bottomRight: Radius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        String.fromCharCode(65 + index),
+                        style: StudyText.mono.copyWith(fontSize: 11),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(options[index], style: StudyText.body),
+                  ],
+                ),
+              );
+            }),
+          ],
         ),
       ),
     );
