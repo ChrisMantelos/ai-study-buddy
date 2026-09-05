@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'study_theme.dart';
 import 'quiz_question.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -42,54 +43,80 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     if (finished) {
-      return _ResultView(
-        score: score,
-        total: widget.questions.length,
-        onRestart: () => Navigator.of(context).pop(),
+      return NotebookBackground(
+        child: _ResultView(
+          score: score,
+          total: widget.questions.length,
+          onRestart: () => Navigator.of(context).pop(),
+        ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Question ${currentIndex + 1} of ${widget.questions.length}'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              currentQuestion.question,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 24),
-            ...List.generate(currentQuestion.options.length, (index) {
-              return _OptionTile(
-                text: currentQuestion.options[index],
-                state: _tileState(index),
-                onTap: () => selectOption(index),
-              );
-            }),
-            if (selectedOption != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                currentQuestion.explanation,
-                style: TextStyle(color: Colors.grey.shade600),
-              ),
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: nextQuestion,
-                  child: Text(
-                    currentIndex == widget.questions.length - 1
-                        ? 'Finish'
-                        : 'Next question',
+      body: NotebookBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.arrow_back, color: StudyColors.ink),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Question ${currentIndex + 1} of ${widget.questions.length}',
+                        style: StudyText.label,
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  Text(currentQuestion.question, style: StudyText.questionText),
+                  const SizedBox(height: 24),
+                  ...List.generate(currentQuestion.options.length, (index) {
+                    return _OptionRow(
+                      letter: String.fromCharCode(65 + index),
+                      text: currentQuestion.options[index],
+                      state: _tileState(index),
+                      onTap: () => selectOption(index),
+                    );
+                  }),
+                  if (selectedOption != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: StudyColors.correctBg,
+                        border: Border(
+                          left: BorderSide(color: StudyColors.correct, width: 4),
+                        ),
+                      ),
+                      child: Text(
+                        currentQuestion.explanation,
+                        style: StudyText.bodySoft.copyWith(fontSize: 13.5),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    HighlighterButton(
+                      label: currentIndex == widget.questions.length - 1
+                          ? 'Finish'
+                          : 'Next question',
+                      onPressed: nextQuestion,
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ],
+            ),
+          ),
         ),
       ),
     );
@@ -105,12 +132,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
 enum _OptionState { neutral, correct, incorrect, disabled }
 
-class _OptionTile extends StatelessWidget {
+class _OptionRow extends StatelessWidget {
+  final String letter;
   final String text;
   final _OptionState state;
   final VoidCallback onTap;
 
-  const _OptionTile({
+  const _OptionRow({
+    required this.letter,
     required this.text,
     required this.state,
     required this.onTap,
@@ -118,17 +147,22 @@ class _OptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color? backgroundColor;
-    Color borderColor = Colors.grey.shade300;
+    final locked = state != _OptionState.neutral;
+
+    Color borderColor = StudyColors.ink;
+    Color fillColor = Colors.white;
+    Color textColor = StudyColors.ink;
 
     switch (state) {
       case _OptionState.correct:
-        backgroundColor = Colors.green.shade50;
-        borderColor = Colors.green;
+        borderColor = StudyColors.correct;
+        fillColor = StudyColors.correct;
+        textColor = Colors.white;
         break;
       case _OptionState.incorrect:
-        backgroundColor = Colors.red.shade50;
-        borderColor = Colors.red;
+        borderColor = StudyColors.incorrect;
+        fillColor = StudyColors.incorrect;
+        textColor = Colors.white;
         break;
       case _OptionState.disabled:
       case _OptionState.neutral:
@@ -138,17 +172,50 @@ class _OptionTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            border: Border.all(color: borderColor),
-            borderRadius: BorderRadius.circular(10),
+        onTap: locked ? null : onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: state == _OptionState.neutral ? Colors.white : fillColor,
+                  border: Border.all(color: borderColor, width: 2),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(14),
+                    topRight: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(15),
+                  ),
+                ),
+                child: Text(
+                  letter,
+                  style: StudyText.mono.copyWith(
+                    fontSize: 12,
+                    color: state == _OptionState.neutral
+                        ? StudyColors.ink
+                        : textColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  text,
+                  style: StudyText.body.copyWith(
+                    color: state == _OptionState.disabled
+                        ? StudyColors.inkSoft
+                        : StudyColors.ink,
+                  ),
+                ),
+              ),
+            ],
           ),
-          child: Text(text),
         ),
       ),
     );
@@ -168,21 +235,22 @@ class _ResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '$score / $total',
-              style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
-            ),
+            Text('$score / $total', style: StudyText.score),
             const SizedBox(height: 8),
-            const Text('Quiz complete'),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: onRestart,
-              child: const Text('Back to notes'),
+            Text('Quiz complete', style: StudyText.bodySoft),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: 220,
+              child: HighlighterButton(
+                label: 'Back to notes',
+                onPressed: onRestart,
+              ),
             ),
           ],
         ),
