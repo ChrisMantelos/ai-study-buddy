@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'study_theme.dart';
 import 'study_buddy_api.dart';
 import 'quiz_screen.dart';
 
@@ -19,8 +20,12 @@ class StudyBuddyApp extends StatelessWidget {
     return MaterialApp(
       title: 'AI Study Buddy',
       theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
+        scaffoldBackgroundColor: StudyColors.paper,
         useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: StudyColors.ink,
+          surface: StudyColors.paper,
+        ),
       ),
       home: const HomeScreen(),
     );
@@ -71,64 +76,132 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AI Study Buddy')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Paste your notes and get a quiz to test yourself.',
-              style: TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: TextField(
-                controller: notesController,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: const InputDecoration(
-                  hintText: 'Paste study notes here...',
-                  border: OutlineInputBorder(),
-                ),
+      body: NotebookBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Study Buddy', style: StudyText.masthead),
+                      Text(
+                        backendUrl.replaceFirst('http://', ''),
+                        style: StudyText.label,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(height: 3, color: StudyColors.ink),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Paste your notes below. Fill in the answer sheet that comes back.',
+                    style: StudyText.bodySoft,
+                  ),
+                  const SizedBox(height: 24),
+                  Text('NOTES', style: StudyText.label),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 220,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: StudyColors.ink, width: 2),
+                    ),
+                    child: TextField(
+                      controller: notesController,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      style: StudyText.mono,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: 'Paste study notes here...',
+                        hintStyle: StudyText.mono.copyWith(
+                          color: StudyColors.inkSoft,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('Questions', style: StudyText.mono),
+                      const SizedBox(width: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: StudyColors.ink, width: 2),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            value: numQuestions,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            style: StudyText.mono,
+                            items: [3, 5, 7, 10]
+                                .map((n) => DropdownMenuItem(
+                                    value: n, child: Text('$n')))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => numQuestions = value);
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: StudyColors.incorrectBg,
+                        border: Border(
+                          left: BorderSide(
+                              color: StudyColors.incorrect, width: 4),
+                        ),
+                      ),
+                      child: Text(
+                        errorMessage!,
+                        style: StudyText.mono.copyWith(
+                          color: StudyColors.incorrect,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  HighlighterButton(
+                    label: 'Generate quiz',
+                    onPressed: loading ? null : generateQuiz,
+                    child: loading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: StudyColors.ink,
+                            ),
+                          )
+                        : Text(
+                            'Generate quiz',
+                            style: StudyText.body.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text('Questions:'),
-                const SizedBox(width: 12),
-                DropdownButton<int>(
-                  value: numQuestions,
-                  items: [3, 5, 7, 10]
-                      .map((n) => DropdownMenuItem(value: n, child: Text('$n')))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) setState(() => numQuestions = value);
-                  },
-                ),
-              ],
-            ),
-            if (errorMessage != null) ...[
-              const SizedBox(height: 8),
-              Text(errorMessage!, style: const TextStyle(color: Colors.red)),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: loading ? null : generateQuiz,
-                child: loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Generate quiz'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
