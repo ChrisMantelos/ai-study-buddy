@@ -1,5 +1,6 @@
 import re
 from rank_bm25 import BM25Okapi
+import database
 
 
 def chunk_text(text: str, max_words: int = 120) -> list[str]:
@@ -25,9 +26,17 @@ class NoteLibrary:
     def __init__(self):
         self.chunks: list[str] = []
         self.sources: list[str] = []
+        database.init_db()
+        self._load_from_db()
+
+    def _load_from_db(self) -> None:
+        rows = database.fetch_all_chunks()
+        self.chunks = [chunk for _, chunk in rows]
+        self.sources = [source for source, _ in rows]
 
     def add_document(self, title: str, text: str) -> int:
         new_chunks = chunk_text(text)
+        database.insert_chunks(title, new_chunks)
         self.chunks.extend(new_chunks)
         self.sources.extend([title] * len(new_chunks))
         return len(new_chunks)
