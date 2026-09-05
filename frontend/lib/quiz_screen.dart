@@ -179,27 +179,32 @@ class _OptionRow extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                width: 28,
-                height: 28,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: state == _OptionState.neutral ? Colors.white : fillColor,
-                  border: Border.all(color: borderColor, width: 2),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(14),
-                    topRight: Radius.circular(12),
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(15),
+              AnimatedScale(
+                scale: state == _OptionState.neutral ? 1.0 : 1.1,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.elasticOut,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: state == _OptionState.neutral ? Colors.white : fillColor,
+                    border: Border.all(color: borderColor, width: 2),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(14),
+                      topRight: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(15),
+                    ),
                   ),
-                ),
-                child: Text(
-                  letter,
-                  style: StudyText.mono.copyWith(
-                    fontSize: 12,
-                    color: state == _OptionState.neutral
-                        ? StudyColors.ink
-                        : textColor,
+                  child: Text(
+                    letter,
+                    style: StudyText.mono.copyWith(
+                      fontSize: 12,
+                      color: state == _OptionState.neutral
+                          ? StudyColors.ink
+                          : textColor,
+                    ),
                   ),
                 ),
               ),
