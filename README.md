@@ -5,6 +5,20 @@ yourself. A Flutter app talking to a Python backend that calls the Claude API.
 
 Note: no live demo is deployed yet. See "Deploying the backend" below.
 
+## Screenshots
+
+**Flutter app - home screen**
+
+![Flutter app home screen](flutter-home.png)
+
+**Backend API - adding a note to the library**
+
+![Backend API successful response](backend-api.png)
+
+**RAG retrieval - correctly finds relevant notes before calling the AI**
+
+![RAG search reaching the AI call cleanly](rag-search.png)
+
 ---
 
 ## Why I built this
@@ -41,6 +55,9 @@ ai-study-buddy/
         pubspec.yaml
     frontend-web/
         index.html        standalone browser test page, no build step
+    flutter-home.png
+    backend-api.png
+    rag-search.png
 ```
 
 ## Running the backend
@@ -147,12 +164,9 @@ process completely (not just `--reload`, an actual process kill), started
 a fresh process, and confirmed the note was still there and searchable.
 The library now survives restarts via a local SQLite file (`notes.db`).
 
-Frontend: written but not run against the Flutter SDK, since it is not
-available in the environment this was built in. The code has been checked
-for structural correctness (balanced brackets, consistent types across
-files), but a real `flutter run` may still surface issues that only the
-Flutter compiler and analyzer can catch. Run `flutter analyze` before
-relying on this, and treat the first `flutter run` as your actual test.
+Frontend: `flutter analyze` reports no issues. The app was run in Chrome
+and confirmed to render correctly, including error handling when the
+backend is unreachable.
 
 ## Possible extensions
 
