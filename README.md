@@ -7,6 +7,12 @@ Live backend: [ai-study-buddy-lazv.onrender.com](https://ai-study-buddy-lazv.onr
 (hosted on Render's free tier - the first request after a period of
 inactivity can take 30-50 seconds to wake up)
 
+The root URL itself returns a 404 - that's expected, there's nothing
+defined there. To actually see it working, try:
+
+- [/health](https://ai-study-buddy-lazv.onrender.com/health) - confirms the server is running
+- [/docs](https://ai-study-buddy-lazv.onrender.com/docs) - interactive API docs where you can try every endpoint directly in the browser
+
 ## Screenshots
 
 **Flutter app - home screen**
