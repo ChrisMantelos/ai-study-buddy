@@ -1,10 +1,12 @@
 import os
 import json
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from anthropic import Anthropic, APIError, APIConnectionError
 from rag import NoteLibrary
+import database
 
 app = FastAPI(title="AI Study Buddy API")
 library = NoteLibrary()
@@ -30,6 +32,7 @@ class QuizQuestion(BaseModel):
 
 
 class QuizResponse(BaseModel):
+    quiz_id: int
     questions: list[QuizQuestion]
 
 
@@ -47,6 +50,11 @@ class AddNoteResponse(BaseModel):
 class TopicQuizRequest(BaseModel):
     topic: str = Field(min_length=1, max_length=300)
     num_questions: int = Field(default=5, ge=1, le=10)
+
+
+class SubmitScoreRequest(BaseModel):
+    score: int = Field(ge=0)
+    total: int = Field(ge=1)
 
 
 def get_client() -> Anthropic:
@@ -69,10 +77,9 @@ def build_prompt(notes: str, num_questions: int) -> str:
     )
 
 
-@app.post("/generate-quiz", response_model=QuizResponse)
-def generate_quiz(request: QuizRequest) -> QuizResponse:
+def call_claude_for_quiz(notes: str, num_questions: int) -> list[dict]:
     client = get_client()
-    prompt = build_prompt(request.notes, request.num_questions)
+    prompt = build_prompt(notes, num_questions)
 
     try:
         response = client.messages.create(
@@ -89,9 +96,20 @@ def generate_quiz(request: QuizRequest) -> QuizResponse:
 
     try:
         parsed = json.loads(raw_text)
-        return QuizResponse(**parsed)
-    except (json.JSONDecodeError, TypeError, ValueError):
+        return parsed["questions"]
+    except (json.JSONDecodeError, TypeError, ValueError, KeyError):
         raise HTTPException(status_code=502, detail="AI response was not valid quiz data.")
+
+
+@app.post("/generate-quiz", response_model=QuizResponse)
+def generate_quiz(request: QuizRequest) -> QuizResponse:
+    questions = call_claude_for_quiz(request.notes, request.num_questions)
+    quiz_id = database.insert_quiz_record(
+        source="Pasted notes",
+        num_questions=len(questions),
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    return QuizResponse(quiz_id=quiz_id, questions=questions)
 
 
 @app.get("/health")
@@ -126,25 +144,26 @@ def generate_quiz_from_topic(request: TopicQuizRequest) -> QuizResponse:
         raise HTTPException(status_code=404, detail=f"No notes found matching '{request.topic}'.")
 
     combined_notes = "\n\n".join(chunk["text"] for chunk in relevant_chunks)
+    questions = call_claude_for_quiz(combined_notes, request.num_questions)
 
-    client = get_client()
-    prompt = build_prompt(combined_notes, request.num_questions)
+    matched_source = relevant_chunks[0]["source"]
+    quiz_id = database.insert_quiz_record(
+        source=matched_source,
+        num_questions=len(questions),
+        created_at=datetime.now(timezone.utc).isoformat(),
+    )
+    return QuizResponse(quiz_id=quiz_id, questions=questions)
 
-    try:
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": prompt}],
-        )
-    except APIConnectionError:
-        raise HTTPException(status_code=502, detail="Could not reach the AI service.")
-    except APIError as exc:
-        raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
 
-    raw_text = response.content[0].text.strip()
+@app.post("/quiz-history/{quiz_id}/score")
+def submit_score(quiz_id: int, request: SubmitScoreRequest) -> dict:
+    updated = database.update_quiz_score(quiz_id, request.score, request.total)
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"No quiz found with id {quiz_id}.")
+    return {"quiz_id": quiz_id, "score": request.score, "total": request.total}
 
-    try:
-        parsed = json.loads(raw_text)
-        return QuizResponse(**parsed)
-    except (json.JSONDecodeError, TypeError, ValueError):
-        raise HTTPException(status_code=502, detail="AI response was not valid quiz data.")
+
+@app.get("/quiz-history")
+def get_quiz_history() -> dict:
+    history = database.fetch_quiz_history_with_notes()
+    return {"history": history}
