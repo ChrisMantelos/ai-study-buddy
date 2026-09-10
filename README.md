@@ -3,7 +3,9 @@
 Paste study notes, get a multiple-choice quiz generated from them, and test
 yourself. A Flutter app talking to a Python backend that calls the Claude API.
 
-Note: no live demo is deployed yet. See "Deploying the backend" below.
+Live backend: [ai-study-buddy-lazv.onrender.com](https://ai-study-buddy-lazv.onrender.com)
+(hosted on Render's free tier - the first request after a period of
+inactivity can take 30-50 seconds to wake up)
 
 ## Screenshots
 
