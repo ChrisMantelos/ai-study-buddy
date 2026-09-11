@@ -22,6 +22,7 @@ app.add_middleware(
 class QuizRequest(BaseModel):
     notes: str = Field(min_length=1, max_length=8000)
     num_questions: int = Field(default=5, ge=1, le=10)
+    difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
 
 
 class QuizQuestion(BaseModel):
@@ -50,6 +51,7 @@ class AddNoteResponse(BaseModel):
 class TopicQuizRequest(BaseModel):
     topic: str = Field(min_length=1, max_length=300)
     num_questions: int = Field(default=5, ge=1, le=10)
+    difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
 
 
 class SubmitScoreRequest(BaseModel):
@@ -64,12 +66,20 @@ def get_client() -> Anthropic:
     return Anthropic(api_key=key)
 
 
-def build_prompt(notes: str, num_questions: int) -> str:
+DIFFICULTY_INSTRUCTIONS = {
+    "easy": "Keep questions straightforward, testing basic recall of facts stated directly in the notes.",
+    "medium": "Questions should require understanding the material, not just spotting a matching phrase.",
+    "hard": "Questions should require connecting multiple ideas from the notes or applying them to a new situation, not just recalling a single fact.",
+}
+
+
+def build_prompt(notes: str, num_questions: int, difficulty: str = "medium") -> str:
+    difficulty_instruction = DIFFICULTY_INSTRUCTIONS.get(difficulty, DIFFICULTY_INSTRUCTIONS["medium"])
     return (
         f"Create exactly {num_questions} multiple-choice quiz questions "
         f"based on these study notes. Each question needs 4 options with "
         f"exactly one correct answer, and a short explanation of why that "
-        f"answer is correct.\n\n"
+        f"answer is correct. {difficulty_instruction}\n\n"
         f"Notes:\n{notes}\n\n"
         f"Respond with ONLY valid JSON, no other text, in this exact shape:\n"
         f'{{"questions": [{{"question": "...", "options": ["...", "...", '
@@ -77,9 +87,9 @@ def build_prompt(notes: str, num_questions: int) -> str:
     )
 
 
-def call_claude_for_quiz(notes: str, num_questions: int) -> list[dict]:
+def call_claude_for_quiz(notes: str, num_questions: int, difficulty: str = "medium") -> list[dict]:
     client = get_client()
-    prompt = build_prompt(notes, num_questions)
+    prompt = build_prompt(notes, num_questions, difficulty)
 
     try:
         response = client.messages.create(
@@ -103,7 +113,7 @@ def call_claude_for_quiz(notes: str, num_questions: int) -> list[dict]:
 
 @app.post("/generate-quiz", response_model=QuizResponse)
 def generate_quiz(request: QuizRequest) -> QuizResponse:
-    questions = call_claude_for_quiz(request.notes, request.num_questions)
+    questions = call_claude_for_quiz(request.notes, request.num_questions, request.difficulty)
     quiz_id = database.insert_quiz_record(
         source="Pasted notes",
         num_questions=len(questions),
@@ -144,7 +154,7 @@ def generate_quiz_from_topic(request: TopicQuizRequest) -> QuizResponse:
         raise HTTPException(status_code=404, detail=f"No notes found matching '{request.topic}'.")
 
     combined_notes = "\n\n".join(chunk["text"] for chunk in relevant_chunks)
-    questions = call_claude_for_quiz(combined_notes, request.num_questions)
+    questions = call_claude_for_quiz(combined_notes, request.num_questions, request.difficulty)
 
     matched_source = relevant_chunks[0]["source"]
     quiz_id = database.insert_quiz_record(
