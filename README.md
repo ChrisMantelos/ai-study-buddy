@@ -129,8 +129,13 @@ topic instead of pasting notes:
 ```bash
 curl -X POST http://127.0.0.1:8000/generate-quiz-from-topic \
   -H "Content-Type: application/json" \
-  -d '{"topic": "mitochondria", "num_questions": 5}'
+  -d '{"topic": "mitochondria", "num_questions": 5, "difficulty": "medium"}'
 ```
+
+`difficulty` is optional (`easy`, `medium`, or `hard`; defaults to
+`medium`) and changes how the questions are written - `easy` sticks to
+facts stated directly in the notes, `hard` requires connecting multiple
+ideas rather than just recalling one.
 
 The backend searches the library for the most relevant chunks using BM25
 keyword search, sends only those chunks to Claude, and returns a quiz -
@@ -174,15 +179,33 @@ The library now survives restarts via a local SQLite file (`notes.db`).
 
 Frontend: `flutter analyze` reports no issues. The app was run in Chrome
 and confirmed to render correctly, including error handling when the
-backend is unreachable.
+backend is unreachable, and the difficulty selector renders alongside
+the question count selector as expected.
+
+## Running the automated tests
+
+The backend has a pytest suite covering the behavior described above,
+so it can be re-checked with one command instead of manual curl requests:
+
+```bash
+cd backend
+pip install -r requirements.txt
+pytest tests/ -v
+```
+
+Each test runs against a temporary, isolated SQLite database (not the
+real `notes.db`), so running the tests never affects real data. All 11
+tests pass: input validation, missing/invalid API key handling, adding
+and listing notes, topic search matching and not matching, quiz score
+submission (including the not-found case), and quiz history retrieval.
 
 ## Possible extensions
 
-- Save quiz history locally
 - Support uploading a PDF or image of notes instead of pasting text
 - Flashcard mode in addition to quiz mode
-- Difficulty levels
+- Show past quiz results (score trends over time) in the app itself,
+  using the quiz history data that's already collected
 
 ## Tech stack
 
-Flutter, Dart, Python, FastAPI, Anthropic SDK
+Flutter, Dart, Python, FastAPI, Anthropic SDK, pytest, SQLite
