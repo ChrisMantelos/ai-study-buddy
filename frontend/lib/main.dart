@@ -43,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final api = StudyBuddyApi(baseUrl: backendUrl);
   final notesController = TextEditingController();
   int numQuestions = 5;
+  String difficulty = 'medium';
   bool loading = false;
   String? errorMessage;
 
@@ -58,13 +59,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      final questions = await api.generateQuiz(
+      final result = await api.generateQuiz(
         notes: notesController.text.trim(),
         numQuestions: numQuestions,
+        difficulty: difficulty,
       );
       if (!mounted) return;
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => QuizScreen(questions: questions)),
+        MaterialPageRoute(
+          builder: (_) => QuizScreen(api: api, result: result),
+        ),
       );
     } on QuizApiException catch (e) {
       setState(() => errorMessage = e.message);
@@ -84,154 +88,191 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Study Buddy', style: StudyText.masthead),
-                      Text(
-                        backendUrl.replaceFirst('http://', ''),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Study Buddy', style: StudyText.masthead),
+                        Text(
+                          backendUrl.replaceFirst('http://', ''),
+                          style: StudyText.label,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(height: 3, color: StudyColors.ink),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Paste your notes below. Fill in the answer sheet that comes back.',
+                      style: StudyText.bodySoft,
+                    ),
+                    const SizedBox(height: 24),
+                    Text('NOTES', style: StudyText.label),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 220,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: StudyColors.ink, width: 2),
+                      ),
+                      child: TextField(
+                        controller: notesController,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        style: StudyText.mono,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          hintText: 'Paste study notes here...',
+                          hintStyle: StudyText.mono.copyWith(
+                            color: StudyColors.inkSoft,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${notesController.text.length} / 8000 characters',
                         style: StudyText.label,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(height: 3, color: StudyColors.ink),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Paste your notes below. Fill in the answer sheet that comes back.',
-                    style: StudyText.bodySoft,
-                  ),
-                  const SizedBox(height: 24),
-                  Text('NOTES', style: StudyText.label),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 220,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: StudyColors.ink, width: 2),
                     ),
-                    child: TextField(
-                      controller: notesController,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: StudyText.mono,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        hintText: 'Paste study notes here...',
-                        hintStyle: StudyText.mono.copyWith(
-                          color: StudyColors.inkSoft,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '${notesController.text.length} / 8000 characters',
-                      style: StudyText.label,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Text('Questions', style: StudyText.mono),
-                      const SizedBox(width: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: StudyColors.ink, width: 2),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<int>(
-                            value: numQuestions,
-                            isDense: true,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 8),
-                            style: StudyText.mono,
-                            items: [3, 5, 7, 10]
-                                .map((n) => DropdownMenuItem(
-                                    value: n, child: Text('$n')))
-                                .toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => numQuestions = value);
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (errorMessage != null) ...[
                     const SizedBox(height: 16),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: StudyColors.incorrectBg,
-                        border: Border(
-                          left: BorderSide(
-                              color: StudyColors.incorrect, width: 4),
+                    Wrap(
+                      spacing: 24,
+                      runSpacing: 12,
+                      children: [
+                        _DropdownField<int>(
+                          label: 'Questions',
+                          value: numQuestions,
+                          options: const [3, 5, 7, 10],
+                          labelBuilder: (n) => '$n',
+                          onChanged: (value) => setState(() => numQuestions = value),
                         ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 16,
-                            color: StudyColors.incorrect,
+                        _DropdownField<String>(
+                          label: 'Difficulty',
+                          value: difficulty,
+                          options: const ['easy', 'medium', 'hard'],
+                          labelBuilder: (d) => d,
+                          onChanged: (value) => setState(() => difficulty = value),
+                        ),
+                      ],
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: StudyColors.incorrectBg,
+                          border: Border(
+                            left: BorderSide(
+                                color: StudyColors.incorrect, width: 4),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              errorMessage!,
-                              style: StudyText.mono.copyWith(
-                                color: StudyColors.incorrect,
-                                fontSize: 13,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 16,
+                              color: StudyColors.incorrect,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: StudyText.mono.copyWith(
+                                  color: StudyColors.incorrect,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                    ],
+                    const SizedBox(height: 20),
+                    HighlighterButton(
+                      label: 'Generate quiz',
+                      onPressed: loading ? null : generateQuiz,
+                      child: loading
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: StudyColors.ink,
+                              ),
+                            )
+                          : Text(
+                              'Generate quiz',
+                              style: StudyText.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
+                    const SizedBox(height: 40),
+                    const _ExampleQuestionPreview(),
                   ],
-                  const SizedBox(height: 20),
-                  HighlighterButton(
-                    label: 'Generate quiz',
-                    onPressed: loading ? null : generateQuiz,
-                    child: loading
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: StudyColors.ink,
-                            ),
-                          )
-                        : Text(
-                            'Generate quiz',
-                            style: StudyText.body.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 40),
-                  const _ExampleQuestionPreview(),
-                ],
+                ),
               ),
             ),
           ),
-          ),
         ),
       ),
+    );
+  }
+}
+
+class _DropdownField<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final List<T> options;
+  final String Function(T) labelBuilder;
+  final ValueChanged<T> onChanged;
+
+  const _DropdownField({
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.labelBuilder,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: StudyText.mono),
+        const SizedBox(width: 12),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: StudyColors.ink, width: 2),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              isDense: true,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              style: StudyText.mono,
+              items: options
+                  .map((o) => DropdownMenuItem(value: o, child: Text(labelBuilder(o))))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
