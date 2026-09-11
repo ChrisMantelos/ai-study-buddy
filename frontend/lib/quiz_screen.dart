@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'study_theme.dart';
 import 'quiz_question.dart';
+import 'study_buddy_api.dart';
 
 class QuizScreen extends StatefulWidget {
-  final List<QuizQuestion> questions;
+  final StudyBuddyApi api;
+  final QuizResult result;
 
-  const QuizScreen({super.key, required this.questions});
+  const QuizScreen({super.key, required this.api, required this.result});
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -17,7 +19,8 @@ class _QuizScreenState extends State<QuizScreen> {
   int score = 0;
   bool finished = false;
 
-  QuizQuestion get currentQuestion => widget.questions[currentIndex];
+  List<QuizQuestion> get questions => widget.result.questions;
+  QuizQuestion get currentQuestion => questions[currentIndex];
 
   void selectOption(int index) {
     if (selectedOption != null) return;
@@ -30,8 +33,13 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void nextQuestion() {
-    if (currentIndex == widget.questions.length - 1) {
+    if (currentIndex == questions.length - 1) {
       setState(() => finished = true);
+      widget.api.submitScore(
+        quizId: widget.result.quizId,
+        score: score,
+        total: questions.length,
+      );
       return;
     }
     setState(() {
@@ -46,7 +54,7 @@ class _QuizScreenState extends State<QuizScreen> {
       return NotebookBackground(
         child: _ResultView(
           score: score,
-          total: widget.questions.length,
+          total: questions.length,
           onRestart: () => Navigator.of(context).pop(),
         ),
       );
@@ -55,65 +63,67 @@ class _QuizScreenState extends State<QuizScreen> {
     return Scaffold(
       body: NotebookBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.arrow_back, color: StudyColors.ink),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Question ${currentIndex + 1} of ${widget.questions.length}',
-                        style: StudyText.label,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(currentQuestion.question, style: StudyText.questionText),
-                  const SizedBox(height: 24),
-                  ...List.generate(currentQuestion.options.length, (index) {
-                    return _OptionRow(
-                      letter: String.fromCharCode(65 + index),
-                      text: currentQuestion.options[index],
-                      state: _tileState(index),
-                      onTap: () => selectOption(index),
-                    );
-                  }),
-                  if (selectedOption != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: StudyColors.correctBg,
-                        border: Border(
-                          left: BorderSide(color: StudyColors.correct, width: 4),
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.arrow_back, color: StudyColors.ink),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
                         ),
-                      ),
-                      child: Text(
-                        currentQuestion.explanation,
-                        style: StudyText.bodySoft.copyWith(fontSize: 13.5),
-                      ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Question ${currentIndex + 1} of ${questions.length}',
+                          style: StudyText.label,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
-                    HighlighterButton(
-                      label: currentIndex == widget.questions.length - 1
-                          ? 'Finish'
-                          : 'Next question',
-                      onPressed: nextQuestion,
-                    ),
+                    Text(currentQuestion.question, style: StudyText.questionText),
+                    const SizedBox(height: 24),
+                    ...List.generate(currentQuestion.options.length, (index) {
+                      return _OptionRow(
+                        letter: String.fromCharCode(65 + index),
+                        text: currentQuestion.options[index],
+                        state: _tileState(index),
+                        onTap: () => selectOption(index),
+                      );
+                    }),
+                    if (selectedOption != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: StudyColors.correctBg,
+                          border: Border(
+                            left: BorderSide(color: StudyColors.correct, width: 4),
+                          ),
+                        ),
+                        child: Text(
+                          currentQuestion.explanation,
+                          style: StudyText.bodySoft.copyWith(fontSize: 13.5),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      HighlighterButton(
+                        label: currentIndex == questions.length - 1
+                            ? 'Finish'
+                            : 'Next question',
+                        onPressed: nextQuestion,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
