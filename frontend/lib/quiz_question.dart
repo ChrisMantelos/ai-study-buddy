@@ -20,3 +20,10 @@ class QuizQuestion {
     );
   }
 }
+
+class QuizResult {
+  final int quizId;
+  final List<QuizQuestion> questions;
+
+  QuizResult({required this.quizId, required this.questions});
+}
