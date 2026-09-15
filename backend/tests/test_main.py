@@ -85,3 +85,27 @@ def test_quiz_history_starts_empty(client):
     response = client.get("/quiz-history")
     assert response.status_code == 200
     assert response.json() == {"history": []}
+
+
+def test_accuracy_trend_starts_empty(client):
+    response = client.get("/quiz-history/stats")
+    assert response.status_code == 200
+    assert response.json() == {"trend": []}
+
+
+def test_accuracy_trend_computes_running_average(client):
+    import database
+
+    q1 = database.insert_quiz_record("Biology", 3, "2026-01-01T10:00:00")
+    database.update_quiz_score(q1, score=1, total=3)
+
+    q2 = database.insert_quiz_record("Biology", 3, "2026-01-02T10:00:00")
+    database.update_quiz_score(q2, score=2, total=3)
+
+    response = client.get("/quiz-history/stats")
+    assert response.status_code == 200
+    trend = response.json()["trend"]
+
+    assert len(trend) == 2
+    assert trend[0]["running_avg_accuracy"] == 0.33
+    assert trend[1]["running_avg_accuracy"] == 0.5
