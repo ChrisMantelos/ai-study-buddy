@@ -144,6 +144,29 @@ the same pattern used in the "RAG and Agentic Search" section of the
 SQLite file (`notes.db`, created automatically next to `main.py`), so it
 survives server restarts.
 
+## Tracking accuracy over time (SQL window functions)
+
+Every completed quiz is logged with its score. `GET /quiz-history/stats`
+returns a running average accuracy per topic, computed directly in SQL
+using a window function:
+
+```sql
+SELECT source, created_at, score, total,
+    AVG(CAST(score AS FLOAT) / total) OVER (
+        PARTITION BY source
+        ORDER BY created_at
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS running_avg_accuracy
+FROM quiz_history
+WHERE score IS NOT NULL
+```
+
+`PARTITION BY source` keeps each topic's average separate from the
+others, and `ORDER BY created_at` makes the average "running" - each row
+shows the average up to and including that point in time, not the
+overall average. This is the same window function pattern covered in
+Kaggle's "Advanced SQL" course.
+
 ## Deploying the backend
 
 1. Push this repo to GitHub.
@@ -194,10 +217,12 @@ pytest tests/ -v
 ```
 
 Each test runs against a temporary, isolated SQLite database (not the
-real `notes.db`), so running the tests never affects real data. All 11
+real `notes.db`), so running the tests never affects real data. All 13
 tests pass: input validation, missing/invalid API key handling, adding
 and listing notes, topic search matching and not matching, quiz score
-submission (including the not-found case), and quiz history retrieval.
+submission (including the not-found case), quiz history retrieval, and
+the accuracy trend window-function query (verified against hand-computed
+expected values).
 
 ## Possible extensions
 
