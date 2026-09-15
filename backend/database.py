@@ -93,3 +93,28 @@ def fetch_quiz_history_with_notes() -> list[dict]:
     """).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def fetch_accuracy_trend_by_source() -> list[dict]:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT
+            source,
+            created_at,
+            score,
+            total,
+            ROUND(
+                AVG(CAST(score AS FLOAT) / total) OVER (
+                    PARTITION BY source
+                    ORDER BY created_at
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ),
+                2
+            ) AS running_avg_accuracy
+        FROM quiz_history
+        WHERE score IS NOT NULL AND total IS NOT NULL AND total > 0
+        ORDER BY source, created_at
+    """).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
