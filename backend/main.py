@@ -177,3 +177,9 @@ def submit_score(quiz_id: int, request: SubmitScoreRequest) -> dict:
 def get_quiz_history() -> dict:
     history = database.fetch_quiz_history_with_notes()
     return {"history": history}
+
+
+@app.get("/quiz-history/stats")
+def get_accuracy_trend() -> dict:
+    trend = database.fetch_accuracy_trend_by_source()
+    return {"trend": trend}
