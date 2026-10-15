@@ -1,0 +1,42 @@
+{
+  "notes": [
+    {
+      "title": "Biology: Mitochondria",
+      "text": "Mitochondria are double-membrane structures found in nearly all eukaryotic cells. Their inner membrane is folded into cristae, which increases the surface area available for the electron transport chain. Through oxidative phosphorylation, mitochondria convert nutrients into ATP, the molecule that cells spend to do work.\n\nMitochondria carry their own circular DNA and divide independently of the cell, which supports the endosymbiotic theory: they descend from free-living bacteria engulfed by an ancestral cell."
+    },
+    {
+      "title": "Biology: Photosynthesis",
+      "text": "Photosynthesis takes place in chloroplasts. In the light-dependent reactions, chlorophyll in the thylakoid membranes captures light, splits water molecules and releases oxygen, while producing ATP and NADPH.\n\nThe Calvin cycle then runs in the stroma. It uses the ATP and NADPH to fix carbon dioxide into glucose. Because the Calvin cycle does not need light directly, it is also called the light-independent stage."
+    },
+    {
+      "title": "Networking: TCP vs UDP",
+      "text": "TCP is a connection-oriented transport protocol. It opens a connection with a three-way handshake, numbers every segment, retransmits anything that is lost and delivers data in order, which makes it reliable but slower.\n\nUDP is connectionless. It sends independent datagrams with no handshake, no retransmission and no ordering guarantee. Its low overhead makes it a good fit for live video, online games and DNS lookups, where a late packet is worth less than a missing one."
+    },
+    {
+      "title": "Databases: Normalization",
+      "text": "Database normalization organizes tables to reduce redundancy and prevent update anomalies. First normal form requires atomic values, so every column holds a single value. Second normal form removes partial dependencies on part of a composite key.\n\nThird normal form removes transitive dependencies, meaning non-key columns must depend only on the key. Denormalizing on purpose can speed up read-heavy reporting queries at the cost of extra storage."
+    },
+    {
+      "title": "History: French Revolution",
+      "text": "The French Revolution began in 1789 when the Estates-General met and the Third Estate declared itself a National Assembly. On 14 July the Bastille prison was stormed, and in August the Declaration of the Rights of Man and of the Citizen was adopted.\n\nThe monarchy ended with the execution of Louis XVI in 1793. The Reign of Terror followed under Robespierre and the Committee of Public Safety, and the decade closed with Napoleon Bonaparte seizing power in 1799."
+    },
+    {
+      "title": "Economics: Inflation",
+      "text": "Inflation is a sustained rise in the general price level, which reduces the purchasing power of money. It is usually measured by the consumer price index, which tracks the cost of a fixed basket of goods and services over time.\n\nDemand-pull inflation happens when spending outpaces supply, while cost-push inflation comes from higher input costs such as wages or energy. Central banks typically respond by raising interest rates to cool demand."
+    }
+  ],
+  "queries": [
+    {"query": "mitochondria ATP", "expected_source": "Biology: Mitochondria", "type": "keyword"},
+    {"query": "Calvin cycle stroma", "expected_source": "Biology: Photosynthesis", "type": "keyword"},
+    {"query": "TCP three-way handshake", "expected_source": "Networking: TCP vs UDP", "type": "keyword"},
+    {"query": "third normal form", "expected_source": "Databases: Normalization", "type": "keyword"},
+    {"query": "Bastille", "expected_source": "History: French Revolution", "type": "keyword"},
+    {"query": "consumer price index", "expected_source": "Economics: Inflation", "type": "keyword"},
+    {"query": "powerhouse organelle that makes cellular fuel", "expected_source": "Biology: Mitochondria", "type": "paraphrase"},
+    {"query": "how do plants turn sunlight into sugar", "expected_source": "Biology: Photosynthesis", "type": "paraphrase"},
+    {"query": "which protocol suits real-time calls where speed matters more than reliability", "expected_source": "Networking: TCP vs UDP", "type": "paraphrase"},
+    {"query": "avoiding duplicated data across tables", "expected_source": "Databases: Normalization", "type": "paraphrase"},
+    {"query": "what led to the king being executed", "expected_source": "History: French Revolution", "type": "paraphrase"},
+    {"query": "what do monetary authorities do when everything gets more expensive", "expected_source": "Economics: Inflation", "type": "paraphrase"}
+  ]
+}
