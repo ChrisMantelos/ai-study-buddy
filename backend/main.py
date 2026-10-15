@@ -183,3 +183,7 @@ def get_quiz_history() -> dict:
 def get_accuracy_trend() -> dict:
     trend = database.fetch_accuracy_trend_by_source()
     return {"trend": trend}
+
+from agent_routes import register_agent_routes
+
+register_agent_routes(app, lambda: library, get_client)
