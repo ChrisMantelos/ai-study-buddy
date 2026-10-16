@@ -1,0 +1,4 @@
+# Extra packages for evaluate.py --mode dense/hybrid (not needed to run the app)
+gensim>=4.3.0
+# For --embedder minilm instead of glove (large: pulls in PyTorch):
+# sentence-transformers>=3.0.0
