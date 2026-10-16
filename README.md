@@ -71,11 +71,13 @@ ai-study-buddy/
         agent.py          tool-using quiz agent (Anthropic SDK tool use)
         agent_routes.py   the POST /agent/generate-quiz endpoint
         quality.py        verify questions against the notes, rewrite bad ones
+        hybrid.py         dense and hybrid retrieval (experiment, not used by the app)
         evaluate.py       retrieval and quiz-quality measurements
         eval_data/
-            dataset.json      starter notes and queries for evaluate.py
-        tests/            pytest suite (test_main.py, test_agent.py)
+            dataset.json      18 notes and 30 queries for evaluate.py
+        tests/            pytest suite (test_main.py, test_agent.py, test_hybrid.py)
         requirements.txt
+        requirements-eval.txt   extra packages for the dense/hybrid experiment only
     frontend/
         lib/
             main.dart          app entry point, notes input screen
@@ -246,27 +248,51 @@ find). It runs against a temporary database, never the real `notes.db`.
 
 ```bash
 cd backend
-python evaluate.py retrieval          # offline, free, no API key
-python evaluate.py quiz --limit 6     # real API calls, needs ANTHROPIC_API_KEY
+python evaluate.py retrieval                  # BM25 only: offline, free, no API key
+python evaluate.py retrieval --mode compare   # BM25 vs dense vs hybrid (pip install -r requirements-eval.txt)
+python evaluate.py quiz --limit 6             # real API calls, needs ANTHROPIC_API_KEY
 ```
 
-### Retrieval (BM25, measured)
+### Retrieval: BM25 vs dense vs hybrid (measured)
 
-Run on the starter dataset: 6 notes and 12 queries. Half are keyword queries
-(the same words as the note), half are paraphrases (different words).
+Run on the starter dataset: 18 short notes (about 36 chunks) and 30 queries.
+Half of the queries are keyword queries (same words as the note), half are
+paraphrases (different words). The notes and queries were written by me for
+testing the setup, so treat the numbers as a demonstration of the method, not a
+benchmark. With 30 queries, one query is worth 3.3 percentage points.
 
-| Queries | n | hit@1 | MRR |
-|---|---|---|---|
-| all | 12 | 58% | 0.76 |
-| keyword | 6 | 100% | 1.00 |
-| paraphrase | 6 | 17% | 0.53 |
+- **bm25**: the keyword search the app uses today.
+- **dense**: cosine similarity of averaged GloVe word vectors (50 dimensions,
+  weighted by IDF). These are static word vectors, much weaker than a real
+  sentence-embedding model; they were used because they run anywhere.
+- **hybrid**: the BM25 ranking and the dense ranking merged with Reciprocal
+  Rank Fusion.
 
-BM25 finds the right note when the query shares its words and often ranks the
-wrong note first when it does not. In this run the right note was still inside
-the top 6 every time (hit@6 is 100%), but that is only because the library has
-6 notes, so that number says little until the dataset is larger. The starter
-dataset is small and was written for testing the setup, so treat these
-numbers as a demonstration of the method, not a benchmark.
+hit@1 is how often the right note is the first result; hit@6 is how often it is
+somewhere in the 6 chunks that the quiz pipeline sends to Claude.
+
+| Mode | hit@1 all | hit@1 paraphrase | hit@6 all | hit@6 paraphrase | MRR all | MRR paraphrase |
+|---|---|---|---|---|---|---|
+| bm25 | 67% | 33% | 87% | 73% | 0.73 | 0.46 |
+| dense | 57% | 33% | 93% | 87% | 0.73 | 0.58 |
+| hybrid | 67% | 33% | 97% | 93% | 0.77 | 0.55 |
+
+What this shows, and what it does not:
+
+- Keyword queries are solved by BM25 (100% hit@1). Dense search alone is worse
+  on them (80%), which is the reason to fuse the two instead of replacing BM25.
+- Paraphrase queries are where BM25 fails: the right note is missing from the 6
+  chunks for 4 of its 15 paraphrase queries. Hybrid cut that to 1 of 15.
+- Hybrid did not improve hit@1 at all (the right note is still first only 33% of
+  the time on paraphrases), so it does not fix which note a quiz is saved under
+  (see Known limitation).
+- Whether getting the right note into the top 6 produces better quizzes has not
+  been measured; that is what the quiz evaluation below is for.
+- Hybrid is not part of the app. It needs a model download and extra memory,
+  which is a poor fit for a small free-tier server. To try a real
+  sentence-embedding model instead of GloVe, run
+  `python evaluate.py retrieval --mode compare --embedder minilm` after
+  installing `sentence-transformers` (not run yet).
 
 ### Quiz quality (not measured yet)
 
@@ -293,9 +319,9 @@ columns are part of the comparison.
 ### Known limitation
 
 For topic quizzes, the quiz history stores the source of the top-ranked chunk.
-When that chunk comes from the wrong note (5 of the 12 queries above ranked a
-wrong note first), the score is saved under the wrong note, which also skews
-the accuracy stats. Agent mode records the sources the agent says it used, but
+When that chunk comes from the wrong note (10 of the 30 queries above ranked a
+wrong note first with BM25), the score is saved under the wrong note, which also
+skews the accuracy stats. Agent mode records the sources the agent says it used, but
 a quiz is still saved under a single source.
 
 ## Tracking accuracy over time (SQL window functions)
@@ -385,7 +411,7 @@ pytest tests/ -v
 `python -m pytest tests/ -v`.)
 
 Each test runs against a temporary, isolated SQLite database (not the
-real `notes.db`), so running the tests never affects real data. All 38
+real `notes.db`), so running the tests never affects real data. All 45
 tests pass.
 
 The first 13 cover the original behavior: input validation, missing/invalid
@@ -402,6 +428,11 @@ submissions and letting the model retry, refusing a quiz submitted before any
 note was retrieved, giving up in plain text, the step limit, the per-note
 accuracy tool, and the endpoint's status codes.
 
+The last 7 cover the hybrid search module with a tiny fake embedder (no model
+download): finding a synonym that keyword search misses, merging the two
+rankings, the keyword fallback for words the embedder does not know, and edge
+cases.
+
 ## Possible extensions
 
 - Support uploading a PDF or image of notes instead of pasting text
@@ -409,8 +440,9 @@ accuracy tool, and the endpoint's status codes.
 - Show past quiz results (score trends over time) in the app itself,
   using the quiz history data that's already collected
 - Use agent mode from the Flutter app, including a "review my weak spots" button
-- Add embeddings and hybrid search (BM25 plus dense) to handle paraphrased
-  queries, and compare it against BM25 with the evaluation script
+- Try a real sentence-embedding model in the hybrid search
+  (`--embedder minilm`), and wire hybrid search into the app if the numbers
+  justify the extra memory and download
 - Save a quiz under every note it used, not just one
 
 ## Tech stack
