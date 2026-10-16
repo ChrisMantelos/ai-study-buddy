@@ -1,6 +1,7 @@
 """Measure the Study Buddy pipelines on a fixed dataset.
 
     python evaluate.py retrieval              # offline and free: BM25 hit rate / MRR
+    python evaluate.py retrieval --mode compare   # BM25 vs dense vs hybrid (needs gensim)
     python evaluate.py quiz --limit 6         # needs ANTHROPIC_API_KEY, makes API calls
 
 `quiz` compares up to four configurations on the same queries:
@@ -94,10 +95,11 @@ def unique(items):
 
 # --------------------------------------------------------------- retrieval
 
-def retrieval_rows(main, dataset: dict, top_k: int) -> list[dict]:
+def retrieval_rows(search, dataset: dict, top_k: int) -> list[dict]:
+    """`search(query, k)` returns ranked chunk dicts with a 'source' key."""
     rows = []
     for item in dataset["queries"]:
-        results = main.library.search(item["query"], top_k=top_k)
+        results = search(item["query"], top_k)
         sources = [r["source"] for r in results]
         rank = next((i for i, s in enumerate(sources, 1) if s == item["expected_source"]), None)
         rows.append(
@@ -127,31 +129,68 @@ def retrieval_stats(rows: list[dict]) -> dict | None:
     }
 
 
-def run_retrieval(args) -> None:
-    dataset = load_dataset(args.dataset)
-    main = build_app(dataset)
-    rows = retrieval_rows(main, dataset, args.top_k)
+def make_searchers(main, modes: list[str], embedder_name: str) -> dict:
+    """One search function per mode. The embedder and index are built once."""
+    searchers = {}
+    index = None
+    for mode in modes:
+        if mode == "bm25":
+            searchers[mode] = lambda query, k: main.library.search(query, top_k=k)
+            continue
+        if index is None:
+            from hybrid import HybridIndex, make_embedder
 
-    groups = {"all": rows}
-    for kind in sorted({r["type"] for r in rows}):
-        groups[kind] = [r for r in rows if r["type"] == kind]
-    summary = {name: retrieval_stats(group) for name, group in groups.items()}
+            index = HybridIndex(main.library.chunks, main.library.sources, make_embedder(embedder_name))
+        searchers[mode] = lambda query, k, _mode=mode: index.search(query, top_k=k, mode=_mode)
+    return searchers
 
-    print(f"\nBM25 retrieval, top_k={args.top_k}, {len(dataset['notes'])} notes, {len(rows)} queries\n")
+
+def print_retrieval_table(summary: dict) -> None:
     print(f"{'queries':<12}{'n':>4}{'hit@1':>8}{'hit@3':>8}{'hit@k':>8}{'MRR':>8}{'empty':>8}")
     for name, s in summary.items():
         print(
             f"{name:<12}{s['n']:>4}{s['hit@1']:>8.0%}{s['hit@3']:>8.0%}"
             f"{s['hit@k']:>8.0%}{s['mrr']:>8.2f}{s['empty']:>8.0%}"
         )
-    misses = [r for r in rows if r["rank"] != 1]
-    if misses:
-        print("\nNot ranked first:")
-        for r in misses:
-            where = f"rank {r['rank']}" if r["rank"] else "not retrieved"
-            print(f"  [{r['type']}] {r['query']!r} -> {where} (top result: {r['top_source']})")
 
-    save_results("retrieval", {"top_k": args.top_k, "summary": summary, "rows": rows})
+
+def run_retrieval(args) -> None:
+    dataset = load_dataset(args.dataset)
+    main = build_app(dataset)
+    modes = ["bm25", "dense", "hybrid"] if args.mode == "compare" else [args.mode]
+    searchers = make_searchers(main, modes, args.embedder)
+
+    results = {}
+    for mode in modes:
+        rows = retrieval_rows(searchers[mode], dataset, args.top_k)
+        groups = {"all": rows}
+        for kind in sorted({r["type"] for r in rows}):
+            groups[kind] = [r for r in rows if r["type"] == kind]
+        results[mode] = {"summary": {n: retrieval_stats(g) for n, g in groups.items()}, "rows": rows}
+
+        label = mode if mode == "bm25" else f"{mode} ({args.embedder} embeddings)"
+        print(f"\n{label}: top_k={args.top_k}, {len(dataset['notes'])} notes, {len(rows)} queries\n")
+        print_retrieval_table(results[mode]["summary"])
+        if len(modes) == 1:
+            for r in (r for r in rows if r["rank"] != 1):
+                where = f"rank {r['rank']}" if r["rank"] else "not retrieved"
+                print(f"  [{r['type']}] {r['query']!r} -> {where} (top result: {r['top_source']})")
+
+    if len(modes) > 1:
+        print("\nSide by side (paraphrase queries are the hard case):\n")
+        print(f"{'mode':<10}{'hit@1 all':>11}{'hit@1 para':>12}{'hit@k para':>12}{'MRR para':>10}{'MRR all':>9}")
+        for mode in modes:
+            s = results[mode]["summary"]
+            para = s.get("paraphrase") or s["all"]
+            print(
+                f"{mode:<10}{s['all']['hit@1']:>11.0%}{para['hit@1']:>12.0%}"
+                f"{para['hit@k']:>12.0%}{para['mrr']:>10.2f}{s['all']['mrr']:>9.2f}"
+            )
+
+    save_results(
+        "retrieval",
+        {"top_k": args.top_k, "embedder": args.embedder, "modes": {m: results[m] for m in modes}},
+    )
 
 
 # -------------------------------------------------------------------- quiz
@@ -324,8 +363,10 @@ def main(argv=None) -> None:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--dataset", default=str(DEFAULT_DATASET))
 
-    r = sub.add_parser("retrieval", parents=[common], help="BM25 hit rate and MRR (offline)")
+    r = sub.add_parser("retrieval", parents=[common], help="retrieval hit rate and MRR (offline)")
     r.add_argument("--top-k", type=int, default=PRODUCTION_TOP_K)
+    r.add_argument("--mode", default="bm25", choices=["bm25", "dense", "hybrid", "compare"])
+    r.add_argument("--embedder", default="glove", choices=["glove", "minilm"])
     r.set_defaults(func=run_retrieval)
 
     q = sub.add_parser("quiz", parents=[common], help="compare quiz quality (uses the API)")
