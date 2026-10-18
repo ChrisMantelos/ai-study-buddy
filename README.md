@@ -176,7 +176,8 @@ keyword search, sends only those chunks to Claude, and returns a quiz -
 the same pattern used in the "RAG and Agentic Search" section of the
 "Building with the Claude API" course. The library is stored in a local
 SQLite file (`notes.db`, created automatically next to `main.py`), so it
-survives server restarts.
+survives server restarts on a machine with a normal disk (see the free-tier
+note under Deploying).
 
 ## Agent mode: a quiz built by a tool-using agent
 
@@ -257,9 +258,9 @@ python evaluate.py quiz --limit 6             # real API calls, needs ANTHROPIC_
 
 Run on the starter dataset: 18 short notes (about 36 chunks) and 30 queries.
 Half of the queries are keyword queries (same words as the note), half are
-paraphrases (different words). The notes and queries were written by me for
-testing the setup, so treat the numbers as a demonstration of the method, not a
-benchmark. With 30 queries, one query is worth 3.3 percentage points.
+paraphrases (different words). The notes and queries are synthetic: they were
+written to test the setup, not collected from real study notes, so treat the
+numbers as a demonstration of the method, not a benchmark. With 30 queries, one query is worth 3.3 percentage points.
 
 - **bm25**: the keyword search the app uses today.
 - **dense**: cosine similarity of averaged GloVe word vectors (50 dimensions,
@@ -293,6 +294,11 @@ What this shows, and what it does not:
   sentence-embedding model instead of GloVe, run
   `python evaluate.py retrieval --mode compare --embedder minilm` after
   installing `sentence-transformers` (not run yet).
+- To reproduce the dense and hybrid rows, install `requirements-eval.txt` with
+  Python 3.12 or 3.13. On Python 3.14 on Windows, `pip` found no ready-made
+  `gensim` package, tried to compile it and the build failed, so
+  `--mode dense`, `--mode hybrid` and `--mode compare` do not run there.
+  `--mode bm25` (the default) works on any version.
 
 ### Quiz quality (not measured yet)
 
@@ -359,6 +365,11 @@ quiz from the notes where the running average is lowest.
 5. Add an environment variable: `ANTHROPIC_API_KEY` with your real key.
 6. Deploy. You get a public URL, something like `https://ai-study-buddy.onrender.com`.
 7. Run the Flutter app with that URL: `flutter run -d chrome --dart-define=BACKEND_URL=https://ai-study-buddy.onrender.com`
+
+Note on the free tier: Render's free web services have no persistent disk, so
+`notes.db` is not kept across redeploys, and may not survive the server going to
+sleep and waking up. Notes added through the live API can therefore disappear.
+The persistence described above was verified on local machines only.
 
 ## Testing status
 
