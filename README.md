@@ -436,8 +436,11 @@ Frontend: `flutter analyze` reports no issues. The app was run in Chrome
 and confirmed to render correctly, including error handling when the
 backend is unreachable, and the difficulty selector renders alongside
 the question count selector as expected. The weak-spot screens (title field
-and "Review my weak spots") were added after that and have not been analyzed or
-run on a device yet.
+and "Review my weak spots") were checked the same way and run in Chrome without
+an API key: the new field and button appear, and the button reports that there
+are no scores yet. The success path (saving a note, taking a quiz, then
+building a weak-spot quiz with the agent) has not been run, since it needs a
+real key.
 
 ## Running the automated tests
 
