@@ -75,7 +75,8 @@ ai-study-buddy/
         evaluate.py       retrieval and quiz-quality measurements
         eval_data/
             dataset.json      18 notes and 30 queries for evaluate.py
-        tests/            pytest suite (test_main.py, test_agent.py, test_hybrid.py)
+        tests/            pytest suite (test_main.py, test_agent.py, test_hybrid.py,
+                          test_weak_spots.py)
         requirements.txt
         requirements-eval.txt   extra packages for the dense/hybrid experiment only
     frontend/
@@ -125,8 +126,37 @@ flutter run -d chrome --dart-define=BACKEND_URL=http://127.0.0.1:8000
 The `BACKEND_URL` define points the app at your running backend. Without
 it, the app defaults to `http://127.0.0.1:8000`.
 
-The Flutter app and the browser page use the fixed-pipeline endpoints. Agent
-mode is available through the API (and `/docs`) only for now.
+The browser page uses the fixed-pipeline quiz endpoint only. The Flutter app
+also has the weak-spot review described in the next section, which uses the
+agent endpoint.
+
+## Review my weak spots (Flutter app + agent)
+
+The home screen has a field called "Save to library as". When it is filled in,
+the pasted notes are also saved to the notes library under that title, and the
+quiz is recorded under the same title (`POST /generate-quiz` accepts an optional
+`source` for this). Every finished quiz submits its score, so each saved note
+builds up an accuracy history.
+
+The "Review my weak spots" button then does this:
+
+1. `GET /weak-spots` ranks the saved notes by average accuracy, weakest first.
+   It is a plain SQL-backed lookup with no AI call, so the app can tell the user
+   "no scores yet" without spending anything.
+2. If there is data, `POST /agent/generate-quiz` is called with the goal "review
+   my weak spots". The agent reads the same statistics through its
+   `get_source_stats` tool, reads the weakest note, writes the questions, and the
+   quality check verifies them.
+3. The quiz screen shows which note the quiz came from, and finishing it submits
+   a new score, which closes the loop.
+
+Quizzes from notes that were pasted without a title are recorded as "Pasted
+notes". They are not in the library, so they are ignored by weak-spot review.
+
+Limits: a quiz that mixes several notes is still saved under one title, so its
+score counts towards that title only. Which note the agent picks as "weakest" is
+the agent's decision based on the statistics; how well it picks has not been
+evaluated.
 
 ## Trying the browser test page (no Flutter needed)
 
@@ -353,8 +383,8 @@ shows the average up to and including that point in time, not the
 overall average. This is the same window function pattern covered in
 Kaggle's "Advanced SQL" course.
 
-The agent's `get_source_stats` tool reads this same query, so it can build a
-quiz from the notes where the running average is lowest.
+The agent's `get_source_stats` tool and `GET /weak-spots` read this same query,
+so a quiz can be built from the notes where the running average is lowest.
 
 ## Deploying the backend
 
@@ -405,7 +435,9 @@ The library now survives restarts via a local SQLite file (`notes.db`).
 Frontend: `flutter analyze` reports no issues. The app was run in Chrome
 and confirmed to render correctly, including error handling when the
 backend is unreachable, and the difficulty selector renders alongside
-the question count selector as expected.
+the question count selector as expected. The weak-spot screens (title field
+and "Review my weak spots") were added after that and have not been analyzed or
+run on a device yet.
 
 ## Running the automated tests
 
@@ -422,7 +454,7 @@ pytest tests/ -v
 `python -m pytest tests/ -v`.)
 
 Each test runs against a temporary, isolated SQLite database (not the
-real `notes.db`), so running the tests never affects real data. All 45
+real `notes.db`), so running the tests never affects real data. All 51
 tests pass.
 
 The first 13 cover the original behavior: input validation, missing/invalid
@@ -444,13 +476,17 @@ download): finding a synonym that keyword search misses, merging the two
 rankings, the keyword fallback for words the embedder does not know, and edge
 cases.
 
+The final 6 cover the weak-spot backend with a stubbed quiz generator: recording
+a quiz under a given note title, the "Pasted notes" default, the title length
+limit, and `GET /weak-spots` (empty, ranked weakest first, and ignoring quizzes
+whose source is not a saved note).
+
 ## Possible extensions
 
 - Support uploading a PDF or image of notes instead of pasting text
 - Flashcard mode in addition to quiz mode
 - Show past quiz results (score trends over time) in the app itself,
   using the quiz history data that's already collected
-- Use agent mode from the Flutter app, including a "review my weak spots" button
 - Try a real sentence-embedding model in the hybrid search
   (`--embedder minilm`), and wire hybrid search into the app if the numbers
   justify the extra memory and download
