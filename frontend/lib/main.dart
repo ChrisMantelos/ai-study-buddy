@@ -42,25 +42,74 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final api = StudyBuddyApi(baseUrl: backendUrl);
   final notesController = TextEditingController();
+  final titleController = TextEditingController();
   int numQuestions = 5;
   String difficulty = 'medium';
-  bool loading = false;
+  // Which action is running: 'quiz', 'weak', or null when idle.
+  String? busy;
   String? errorMessage;
+  // The last note saved to the library, so that pressing the button again (for
+  // example after a failed quiz) does not store the same note twice.
+  String? lastSavedKey;
 
   Future<void> generateQuiz() async {
-    if (notesController.text.trim().isEmpty) {
+    final notes = notesController.text.trim();
+    final title = titleController.text.trim();
+    if (notes.isEmpty) {
       setState(() => errorMessage = 'Paste some notes first.');
       return;
     }
 
     setState(() {
-      loading = true;
+      busy = 'quiz';
       errorMessage = null;
     });
 
     try {
+      // With a title, the note is also saved to the library and the quiz is
+      // recorded under that title, so "Review my weak spots" can use its score.
+      if (title.isNotEmpty) {
+        final key = '$title\n$notes';
+        if (key != lastSavedKey) {
+          await api.addNote(title: title, text: notes);
+          lastSavedKey = key;
+        }
+      }
       final result = await api.generateQuiz(
-        notes: notesController.text.trim(),
+        notes: notes,
+        numQuestions: numQuestions,
+        difficulty: difficulty,
+        source: title.isEmpty ? null : title,
+      );
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => QuizScreen(api: api, result: result),
+        ),
+      );
+    } on QuizApiException catch (e) {
+      if (mounted) setState(() => errorMessage = e.message);
+    } finally {
+      if (mounted) setState(() => busy = null);
+    }
+  }
+
+  Future<void> reviewWeakSpots() async {
+    setState(() {
+      busy = 'weak';
+      errorMessage = null;
+    });
+
+    try {
+      // Cheap check first (no AI): is there any score to learn from?
+      final spots = await api.fetchWeakSpots();
+      if (spots.isEmpty) {
+        throw QuizApiException(
+          'No scores for saved notes yet. Give your notes a title under '
+          '"Save to library as", finish a quiz, then come back here.',
+        );
+      }
+      final result = await api.generateWeakSpotQuiz(
         numQuestions: numQuestions,
         difficulty: difficulty,
       );
@@ -71,9 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } on QuizApiException catch (e) {
-      setState(() => errorMessage = e.message);
+      if (mounted) setState(() => errorMessage = e.message);
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) setState(() => busy = null);
     }
   }
 
@@ -143,6 +192,36 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    Text('SAVE TO LIBRARY AS (OPTIONAL)', style: StudyText.label),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: StudyColors.ink, width: 2),
+                      ),
+                      child: TextField(
+                        controller: titleController,
+                        maxLength: 200,
+                        style: StudyText.mono,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          counterText: '',
+                          hintText: 'e.g. Biology: Mitochondria',
+                          hintStyle: StudyText.mono.copyWith(
+                            color: StudyColors.inkSoft,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'A title keeps these notes in your library. '
+                      'Saved notes are what weak-spot review uses.',
+                      style: StudyText.label,
+                    ),
+                    const SizedBox(height: 16),
                     Wrap(
                       spacing: 24,
                       runSpacing: 12,
@@ -201,18 +280,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 20),
                     HighlighterButton(
                       label: 'Generate quiz',
-                      onPressed: loading ? null : generateQuiz,
-                      child: loading
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: StudyColors.ink,
-                              ),
-                            )
+                      onPressed: busy != null ? null : generateQuiz,
+                      child: busy == 'quiz'
+                          ? const _Spinner()
                           : Text(
                               'Generate quiz',
+                              style: StudyText.body.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 28),
+                    Container(height: 1, color: StudyColors.paperLine),
+                    const SizedBox(height: 20),
+                    Text('WEAK SPOTS', style: StudyText.label),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Builds a quiz from your saved notes where your scores are '
+                      'lowest. An agent reads your history first, so this takes '
+                      'longer than a normal quiz.',
+                      style: StudyText.bodySoft,
+                    ),
+                    const SizedBox(height: 12),
+                    HighlighterButton(
+                      label: 'Review my weak spots',
+                      onPressed: busy != null ? null : reviewWeakSpots,
+                      child: busy == 'weak'
+                          ? const _Spinner()
+                          : Text(
+                              'Review my weak spots',
                               style: StudyText.body.copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -334,6 +430,22 @@ class _ExampleQuestionPreview extends StatelessWidget {
             }),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _Spinner extends StatelessWidget {
+  const _Spinner();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 18,
+      width: 18,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        color: StudyColors.ink,
       ),
     );
   }
