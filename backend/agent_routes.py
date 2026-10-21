@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 import database
-from agent import AgentError, NoQuizError, run_quiz_agent
+from agent import AgentError, NoQuizError, run_quiz_agent, tool_get_source_stats
 
 
 class AgentQuizRequest(BaseModel):
@@ -44,6 +44,11 @@ class AgentQuizResponse(BaseModel):
 
 def register_agent_routes(app, get_library, get_client) -> None:
     """`get_library` is a callable so the route always sees the current library object."""
+
+    @app.get("/weak-spots")
+    def weak_spots() -> dict:
+        """Saved notes ranked by the user's quiz accuracy, weakest first (no AI call)."""
+        return tool_get_source_stats(get_library())
 
     @app.post("/agent/generate-quiz", response_model=AgentQuizResponse)
     def agent_generate_quiz(request: AgentQuizRequest) -> AgentQuizResponse:
