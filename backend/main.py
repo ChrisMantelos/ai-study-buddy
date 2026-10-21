@@ -23,6 +23,9 @@ class QuizRequest(BaseModel):
     notes: str = Field(min_length=1, max_length=8000)
     num_questions: int = Field(default=5, ge=1, le=10)
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
+    # Title of a note saved in the library. When given, the quiz is recorded under
+    # it so that its score counts towards that note's weak-spot statistics.
+    source: str | None = Field(default=None, max_length=200)
 
 
 class QuizQuestion(BaseModel):
@@ -115,7 +118,7 @@ def call_claude_for_quiz(notes: str, num_questions: int, difficulty: str = "medi
 def generate_quiz(request: QuizRequest) -> QuizResponse:
     questions = call_claude_for_quiz(request.notes, request.num_questions, request.difficulty)
     quiz_id = database.insert_quiz_record(
-        source="Pasted notes",
+        source=(request.source or "").strip() or "Pasted notes",
         num_questions=len(questions),
         created_at=datetime.now(timezone.utc).isoformat(),
     )
