@@ -86,6 +86,10 @@ class _QuizScreenState extends State<QuizScreen> {
                         ),
                       ],
                     ),
+                    if (widget.result.source != null) ...[
+                      const SizedBox(height: 12),
+                      Text('FROM: ${widget.result.source}', style: StudyText.label),
+                    ],
                     const SizedBox(height: 20),
                     Text(currentQuestion.question, style: StudyText.questionText),
                     const SizedBox(height: 24),
