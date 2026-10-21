@@ -25,5 +25,29 @@ class QuizResult {
   final int quizId;
   final List<QuizQuestion> questions;
 
-  QuizResult({required this.quizId, required this.questions});
+  /// Title of the saved note the quiz was built from, when the backend knows it.
+  final String? source;
+
+  QuizResult({required this.quizId, required this.questions, this.source});
+}
+
+/// One saved note with the user's average quiz accuracy on it.
+class WeakSpot {
+  final String source;
+  final double avgAccuracy;
+  final int scoredQuizzes;
+
+  WeakSpot({
+    required this.source,
+    required this.avgAccuracy,
+    required this.scoredQuizzes,
+  });
+
+  factory WeakSpot.fromJson(Map<String, dynamic> json) {
+    return WeakSpot(
+      source: json['source'] as String,
+      avgAccuracy: (json['avg_accuracy'] as num).toDouble(),
+      scoredQuizzes: json['scored_quizzes'] as int,
+    );
+  }
 }
