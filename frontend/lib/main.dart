@@ -18,6 +18,7 @@ class StudyBuddyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'AI Study Buddy',
       theme: ThemeData(
         scaffoldBackgroundColor: StudyColors.paper,
@@ -48,6 +49,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // Which action is running: 'quiz', 'weak', or null when idle.
   String? busy;
   String? errorMessage;
+  // Shown under the weak-spot button, so it appears next to what was pressed.
+  String? weakErrorMessage;
   // The last note saved to the library, so that pressing the button again (for
   // example after a failed quiz) does not store the same note twice.
   String? lastSavedKey;
@@ -63,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       busy = 'quiz';
       errorMessage = null;
+      weakErrorMessage = null;
     });
 
     try {
@@ -98,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       busy = 'weak';
       errorMessage = null;
+      weakErrorMessage = null;
     });
 
     try {
@@ -120,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } on QuizApiException catch (e) {
-      if (mounted) setState(() => errorMessage = e.message);
+      if (mounted) setState(() => weakErrorMessage = e.message);
     } finally {
       if (mounted) setState(() => busy = null);
     }
@@ -244,38 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     if (errorMessage != null) ...[
                       const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: StudyColors.incorrectBg,
-                          border: Border(
-                            left: BorderSide(
-                                color: StudyColors.incorrect, width: 4),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 16,
-                              color: StudyColors.incorrect,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                errorMessage!,
-                                style: StudyText.mono.copyWith(
-                                  color: StudyColors.incorrect,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _ErrorBox(message: errorMessage!),
                     ],
                     const SizedBox(height: 20),
                     HighlighterButton(
@@ -314,6 +288,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                     ),
+                    if (weakErrorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      _ErrorBox(message: weakErrorMessage!),
+                    ],
                     const SizedBox(height: 40),
                     const _ExampleQuestionPreview(),
                   ],
@@ -446,6 +424,46 @@ class _Spinner extends StatelessWidget {
       child: CircularProgressIndicator(
         strokeWidth: 2,
         color: StudyColors.ink,
+      ),
+    );
+  }
+}
+
+class _ErrorBox extends StatelessWidget {
+  final String message;
+
+  const _ErrorBox({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: StudyColors.incorrectBg,
+        border: Border(
+          left: BorderSide(color: StudyColors.incorrect, width: 4),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 16,
+            color: StudyColors.incorrect,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: StudyText.mono.copyWith(
+                color: StudyColors.incorrect,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
