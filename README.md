@@ -17,7 +17,7 @@ defined there. To actually see it working, try:
 
 **Flutter app - home screen**
 
-![Flutter app home screen](flutter-home.png)
+![Flutter app home screen](flutter-home(2).png)
 
 **Backend API - adding a note to the library**
 
