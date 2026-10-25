@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'study_theme.dart';
+import 'quiz_question.dart';
 import 'study_buddy_api.dart';
 import 'quiz_screen.dart';
 
@@ -48,12 +49,45 @@ class _HomeScreenState extends State<HomeScreen> {
   String difficulty = 'medium';
   // Which action is running: 'quiz', 'weak', or null when idle.
   String? busy;
+  // Notes ranked by accuracy, weakest first. Null until loaded, or if the
+  // server cannot be reached; the screen then shows the generic description.
+  List<WeakSpot>? weakSpots;
   String? errorMessage;
   // Shown under the weak-spot button, so it appears next to what was pressed.
   String? weakErrorMessage;
   // The last note saved to the library, so that pressing the button again (for
   // example after a failed quiz) does not store the same note twice.
   String? lastSavedKey;
+
+  @override
+  void initState() {
+    super.initState();
+    loadWeakSpots();
+  }
+
+  /// Refreshes the weakest-note summary. A failure is not worth showing an
+  /// error for: the description simply stays generic.
+  Future<void> loadWeakSpots() async {
+    try {
+      final spots = await api.fetchWeakSpots();
+      if (mounted) setState(() => weakSpots = spots);
+    } on QuizApiException {
+      if (mounted) setState(() => weakSpots = null);
+    }
+  }
+
+  /// Opens the quiz, and refreshes the summary when the user comes back,
+  /// because finishing a quiz changes the scores.
+  Future<void> openQuiz(QuizResult result) async {
+    if (!mounted) return;
+    setState(() => busy = null);
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => QuizScreen(api: api, result: result),
+      ),
+    );
+    loadWeakSpots();
+  }
 
   Future<void> generateQuiz() async {
     final notes = notesController.text.trim();
@@ -85,12 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
         difficulty: difficulty,
         source: title.isEmpty ? null : title,
       );
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => QuizScreen(api: api, result: result),
-        ),
-      );
+      await openQuiz(result);
     } on QuizApiException catch (e) {
       if (mounted) setState(() => errorMessage = e.message);
     } finally {
@@ -118,12 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
         numQuestions: numQuestions,
         difficulty: difficulty,
       );
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => QuizScreen(api: api, result: result),
-        ),
-      );
+      await openQuiz(result);
     } on QuizApiException catch (e) {
       if (mounted) setState(() => weakErrorMessage = e.message);
     } finally {
@@ -269,11 +293,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 20),
                     Text('WEAK SPOTS', style: StudyText.label),
                     const SizedBox(height: 6),
-                    Text(
-                      'Builds a quiz from your saved notes where your scores are '
-                      'lowest. An agent reads your history first, so this takes '
-                      'longer than a normal quiz.',
-                      style: StudyText.bodySoft,
+                    _WeakSpotDescription(
+                      weakest: (weakSpots?.isNotEmpty ?? false)
+                          ? weakSpots!.first
+                          : null,
                     ),
                     const SizedBox(height: 12),
                     HighlighterButton(
@@ -462,6 +485,44 @@ class _ErrorBox extends StatelessWidget {
                 fontSize: 13,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The line under "WEAK SPOTS". With scores it names the weakest note; without
+/// them it keeps the generic explanation, so the layout never changes.
+class _WeakSpotDescription extends StatelessWidget {
+  final WeakSpot? weakest;
+
+  const _WeakSpotDescription({required this.weakest});
+
+  @override
+  Widget build(BuildContext context) {
+    final note = weakest;
+    if (note == null) {
+      return Text(
+        'Builds a quiz from your saved notes where your scores are lowest. '
+        'An agent reads your history first, so this takes longer than a '
+        'normal quiz.',
+        style: StudyText.bodySoft,
+      );
+    }
+    final percent = (note.avgAccuracy * 100).round();
+    return Text.rich(
+      TextSpan(
+        style: StudyText.bodySoft,
+        children: [
+          const TextSpan(text: 'Your weakest note right now: '),
+          TextSpan(
+            text: '${note.source} ($percent%)',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const TextSpan(
+            text: '. An agent builds a quiz from the notes where your scores '
+                'are lowest, so this takes a little longer.',
           ),
         ],
       ),
