@@ -73,6 +73,7 @@ ai-study-buddy/
         quality.py        verify questions against the notes, rewrite bad ones
         hybrid.py         dense and hybrid retrieval (experiment, not used by the app)
         evaluate.py       retrieval and quiz-quality measurements
+        seed_demo_data.py demo notes and scores for trying weak-spot review locally
         eval_data/
             dataset.json      18 notes and 30 queries for evaluate.py
         tests/            pytest suite (test_main.py, test_agent.py, test_hybrid.py,
@@ -149,6 +150,16 @@ The "Review my weak spots" button then does this:
    quality check verifies them.
 3. The quiz screen shows which note the quiz came from, and finishing it submits
    a new score, which closes the loop.
+
+When there are scores, the line under "WEAK SPOTS" names the weakest saved note
+and its average accuracy (for example "Your weakest note right now: Biology:
+Mitochondria (25%)") and refreshes when you come back from a quiz. Without
+scores it shows a generic description, so the layout does not change.
+
+To see this without an API key, run `python seed_demo_data.py` from the
+`backend` folder with the server stopped, then start the server. It adds three
+demo notes with scores to the local `notes.db`. `python seed_demo_data.py
+--remove` removes exactly those rows again.
 
 Quizzes from notes that were pasted without a title are recorded as "Pasted
 notes". They are not in the library, so they are ignored by weak-spot review.
@@ -438,9 +449,10 @@ backend is unreachable, and the difficulty selector renders alongside
 the question count selector as expected. The weak-spot screens (title field
 and "Review my weak spots") were checked the same way and run in Chrome without
 an API key: the new field and button appear, and the button reports that there
-are no scores yet. The success path (saving a note, taking a quiz, then
-building a weak-spot quiz with the agent) has not been run, since it needs a
-real key.
+are no scores yet. With demo scores added by `seed_demo_data.py`, the line under
+"WEAK SPOTS" names the weakest note and its accuracy. The success path (saving
+a note, taking a quiz, then building a weak-spot quiz with the agent) has not
+been run, since it needs a real key.
 
 ## Running the automated tests
 
