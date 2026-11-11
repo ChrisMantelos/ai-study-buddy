@@ -1,0 +1,3 @@
+# Extra package for mcp_server.py (not needed to run the FastAPI app)
+# The code targets MCP Python SDK 2.x (MCPServer; it was called FastMCP in 1.x).
+mcp>=2,<3
