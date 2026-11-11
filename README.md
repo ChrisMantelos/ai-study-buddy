@@ -74,12 +74,14 @@ ai-study-buddy/
         hybrid.py         dense and hybrid retrieval (experiment, not used by the app)
         evaluate.py       retrieval and quiz-quality measurements
         seed_demo_data.py demo notes and scores for trying weak-spot review locally
+        mcp_server.py     local MCP server for the notes library (stdio)
         eval_data/
             dataset.json      18 notes and 30 queries for evaluate.py
         tests/            pytest suite (test_main.py, test_agent.py, test_hybrid.py,
-                          test_weak_spots.py)
+                          test_weak_spots.py, test_mcp_server.py)
         requirements.txt
         requirements-eval.txt   extra packages for the dense/hybrid experiment only
+        requirements-mcp.txt    extra package for the MCP server only
     frontend/
         lib/
             main.dart          app entry point, notes input screen
@@ -397,6 +399,64 @@ Kaggle's "Advanced SQL" course.
 The agent's `get_source_stats` tool and `GET /weak-spots` read this same query,
 so a quiz can be built from the notes where the running average is lowest.
 
+## MCP server (local)
+
+`backend/mcp_server.py` exposes the notes library and the quiz history to any
+MCP client, such as Claude Desktop or Claude Code, over stdio. The client's own
+model then builds and runs quizzes from your notes. The tools reuse the
+functions of the agent in `agent.py`.
+
+| Kind | Name | What it does |
+|---|---|---|
+| Tool | `list_notes` | titles of the saved notes, with chunk counts |
+| Tool | `search_notes` | BM25 keyword search over all chunks |
+| Tool | `get_note` | the full text of one note, by exact title |
+| Tool | `get_source_stats` | average quiz accuracy per note, weakest first |
+| Tool | `record_quiz_score` | saves the result of a quiz under a note (this one writes to the database) |
+| Resource | `study-buddy://notes` | the note titles, one per line |
+| Resource | `study-buddy://notes/{title}` | the text of one note (percent-encode the title) |
+| Prompt | `quiz_me` | quiz me on a topic, from my notes only |
+| Prompt | `review_weak_spots` | quiz me on my weakest note |
+
+`record_quiz_score` is what closes the loop: a quiz taken inside the client is
+saved to the same history that `GET /weak-spots` and the Flutter app read.
+
+Install the extra package, then connect a client:
+
+```bash
+cd backend
+python -m pip install -r requirements-mcp.txt
+```
+
+Claude Desktop: add this to its `claude_desktop_config.json` (use the full path
+of the Python that has `mcp` installed and of `mcp_server.py`), then restart it.
+
+```json
+{
+  "mcpServers": {
+    "study-buddy": {
+      "command": "C:\\path\\to\\python.exe",
+      "args": ["C:\\path\\to\\ai-study-buddy\\backend\\mcp_server.py"]
+    }
+  }
+}
+```
+
+Claude Code: `claude mcp add study-buddy -- python /path/to/backend/mcp_server.py`.
+
+Notes:
+- The server reads the same `notes.db` as the FastAPI server (the one in the
+  `backend` folder), or the file named by the `STUDY_BUDDY_DB` environment
+  variable. It reloads the library on every call, so notes added through the API
+  while it runs are visible.
+- It runs locally and has no authentication. Using it from another machine, for
+  example on Render, would need a remote transport and authentication, which is
+  not implemented.
+- The code uses the MCP Python SDK 2.x (`MCPServer`, called `FastMCP` in 1.x),
+  and `requirements-mcp.txt` pins it to that major version.
+- Nothing is printed to stdout, because stdout carries the protocol; the one
+  startup line goes to stderr.
+
 ## Deploying the backend
 
 1. Push this repo to GitHub.
@@ -454,6 +514,11 @@ are no scores yet. With demo scores added by `seed_demo_data.py`, the line under
 a note, taking a quiz, then building a weak-spot quiz with the agent) has not
 been run, since it needs a real key.
 
+The MCP server was tested by starting the real server as a subprocess and
+talking to it with the official MCP Python client over stdio: listing tools,
+resources and prompts, calling every tool, reading resources and getting
+prompts. It has not been connected to Claude Desktop or Claude Code yet.
+
 ## Running the automated tests
 
 The backend has a pytest suite covering the behavior described above,
@@ -469,8 +534,8 @@ pytest tests/ -v
 `python -m pytest tests/ -v`.)
 
 Each test runs against a temporary, isolated SQLite database (not the
-real `notes.db`), so running the tests never affects real data. All 51
-tests pass.
+real `notes.db`), so running the tests never affects real data. All 59
+tests pass with the MCP SDK installed (without it, the MCP tests are skipped).
 
 The first 13 cover the original behavior: input validation, missing/invalid
 API key handling, adding and listing notes, topic search matching and not
@@ -496,6 +561,11 @@ a quiz under a given note title, the "Pasted notes" default, the title length
 limit, and `GET /weak-spots` (empty, ranked weakest first, and ignoring quizzes
 whose source is not a saved note).
 
+The last 8 cover the MCP server. Five start the real server over stdio (tools,
+resources, prompts, and a recorded score changing the weak-spot ranking); three
+call it directly (score validation, notes added while it runs, and the database
+path from the environment). They need `pip install -r requirements-mcp.txt`.
+
 ## Possible extensions
 
 - Support uploading a PDF or image of notes instead of pasting text
@@ -506,7 +576,8 @@ whose source is not a saved note).
   (`--embedder minilm`), and wire hybrid search into the app if the numbers
   justify the extra memory and download
 - Save a quiz under every note it used, not just one
+- Serve the MCP server remotely, with authentication, so it can run next to the deployed API
 
 ## Tech stack
 
-Flutter, Dart, Python, FastAPI, Anthropic SDK (including tool use), pytest, SQLite
+Flutter, Dart, Python, FastAPI, Anthropic SDK (including tool use), MCP Python SDK, pytest, SQLite
